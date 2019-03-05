@@ -88,9 +88,7 @@ public class AsyncJokeClient {                                                  
             do {
                 anotherJoke = in.readLine();                                                             // if the client hits enter, it will print another joke in the server
                 indexArray.clear();                                                                      // clear out the indexArray ArrayList each loop
-
                                                                                                         // instantiates a new thread that will run the logic in the AdminAsync class
-
                 if(anotherJoke.indexOf("quit") < 0 && userName.indexOf("quit")<0) {                                                                                     // if the client doesn't initially type quit or type quit in the console in any subsequent iterations, execute the function call
 
                     indexArray = getJokeProverb(userName, userId, order.get(0), order.get(1), jokeIndex, proverbIndex, serverName, in);      // set indexArray equal to return value of getJokeProverb (jokeIndex in first indexArray, proverbIndex in second indexArray)
@@ -176,23 +174,14 @@ public class AsyncJokeClient {                                                  
             AsyncUDPWorker asyncUDP = new AsyncUDPWorker();
             asyncUDP.start();
 
+            //how to wait until this block of code is over before cutting out of loop?? (add if check/break at bottom?)
             while(AsyncUDPWorker.receivedString == null){
                 System.out.println("Enter 2 numbers to sum (separated by a spaces): ");
                 String twoNumInput = in.readLine();
                 String[] twoNumSplit = twoNumInput.split(" ");
                 int sum = Integer.parseInt(twoNumSplit[0]) + Integer.parseInt(twoNumSplit[1]);
                 System.out.println("Your sum = "+ sum);
-
-                System.out.println(AsyncUDPWorker.receivedString);
-
-                //write custom getUDPResponse function and put here
-                //in this function, either return null or return the UDP request Datagram
-                //check the response in the conditional of the while(  )
-                //if it's null, ask for 2 nums and return sum
-                //if not null, return UDP datagram and proceed with the rest of the program below
             }
-
-
 
             for(int i=0; i<3; i++) {                                                            // receives a 5 line response from JokeServer if no exceptions on server.
                 textFromServer = fromServer.readLine();
@@ -240,21 +229,6 @@ class AsyncUDPWorker extends Thread {
 
             receivedString = new String(udpPacket.getData(), 0, udpPacket.getLength());
             System.out.println("Received String = " + receivedString);
-
-/*
-            String jokeProverbString = "JA";
-            System.out.println(jokeProverbString);
-
-            //get port and IP address from the client
-            int clientPort = udpPacket.getPort();
-            InetAddress clientAddress = udpPacket.getAddress();
-
-            udpBufferToSend = jokeProverbString.getBytes();
-
-            DatagramPacket udpPacketSent = new DatagramPacket(udpBufferToSend, udpBufferToSend.length, clientAddress, clientPort);
-
-            udpSocket.send(udpPacketSent);
-*/
 
             udpSocket.close();
 

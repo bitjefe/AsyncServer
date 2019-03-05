@@ -11,7 +11,6 @@
     > java AsyncJokeAdminClient
 
    List of files needed for running the program
-    - checklist.html
     - AsyncJokeServer.java
     - AsyncJokeClient.java
     - AsyncJokeAdminClient.java
@@ -81,13 +80,10 @@ class Worker extends Thread {                               // Class declaration
                 //sleep for 40 seconds = 40000 milliseconds (using 4000 = 4 secs for testing)
                 Thread.sleep(4000);
 
-                ConnectUDP();
-
+                getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
 
                 System.out.println("we slept for 40 seconds");
 
-
-                //getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
 
             } catch (IndexOutOfBoundsException | InterruptedException x) {                                                     // if there's an IndexOutOfBoundsException...do the following below:
                 System.out.println("Server read error");                                                // handles the IndexOutOfBoundsException's and displays the error trail to the client
@@ -98,7 +94,7 @@ class Worker extends Thread {                               // Class declaration
             System.out.println(ioe);                                                                    // handles the IOException's and displays the error to the client
         }
     }
-
+/*
     private void ConnectUDP() throws IOException {
 
         DatagramSocket newupdSocket = new DatagramSocket();
@@ -113,6 +109,22 @@ class Worker extends Thread {                               // Class declaration
         newupdSocket.send(udpPacket);
 
         System.out.println("sent");
+
+        newupdSocket.close();
+    }
+*/
+    private static void sendUDPJokeProverb(String jokeProverbToSend) throws IOException {
+
+        DatagramSocket newupdSocket = new DatagramSocket();
+
+        byte[] udpBuffer = new byte[256];
+        //DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length);
+        //updSocket.receive(udpPacket);
+
+        String response = jokeProverbToSend;
+        udpBuffer = response.getBytes();
+        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49000);
+        newupdSocket.send(udpPacket);
 
         newupdSocket.close();
     }
@@ -181,7 +193,8 @@ class Worker extends Thread {                               // Class declaration
                 } else {                                                            // if the jokeIndex is between 0-3, do the following:
                     if(jokeIndex ==0) {                                             // if the jokeIndex equals 0:
                         if(jokeOrderList.get(0).equals("A")){                       // This set of if-else statements looks to match the the first random joke in jokeOrderList to "A","B","C", or "D" and send the corresponding joke back to the AsyncJokeClient
-                            out.println(jokesArr[0][1]);
+                          //  out.println(jokesArr[0][1]);
+                            sendUDPJokeProverb(jokesArr[0][1]);     //RETURNS FIRST JOKE!!, REPEAT FOR ALL INSTANCES BELOW AND JOKE+PROVERBiNDEX
                             System.out.println((jokesArr[0][1]));
                         } else if(jokeOrderList.get(0).equals("B")){
                             out.println(jokesArr[1][1]);
@@ -244,7 +257,7 @@ class Worker extends Thread {                               // Class declaration
 
                     jokeIndex++;                                                    // increment jokeIndex by 1
                 }
-            } catch (IndexOutOfBoundsException ex) {                                // if there's an IndexOutOfBoundsException...do the following below:
+            } catch (IndexOutOfBoundsException | IOException ex) {                                // if there's an IndexOutOfBoundsException...do the following below:
                 out.println("Failed in attempt to look up " + userId);              // handles the IndexOutOfBoundsException's and displays the error to the client
             }
         }
