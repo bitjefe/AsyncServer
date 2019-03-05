@@ -58,11 +58,9 @@ class Worker extends Thread {                               // Class declaration
                 String userName;                                                                        // local definition for userName (What the client enters for their name) of type String
                 String userId;                                                                          // local definition for userID (UUID) of type String
 
-                System.out.println("before read input");
                 userId = in.readLine();                                                                 // read in the userId (UUID) from the AsyncJokeClient
                 clientNameAndOrderString = in.readLine();                                               // read in the userName, Joke Order, Proverb Ordered from the AsyncJokeClient
 
-                System.out.println("after read input");
                 String[] clientNameAndOrderArray = clientNameAndOrderString.split(":");           // split above string on colons and add to clientNameAndOrderArray
 
                 userName = clientNameAndOrderArray[0];                                                  // assign userName to first index of clientNameAndOrderArray
@@ -76,19 +74,20 @@ class Worker extends Thread {                               // Class declaration
                 proverbIndex = Integer.parseInt(proverbIndexString);                                    // parse proverbIndexString into an integer, proverbIndex, for use in the server processing code "getJokeProverb"
 
                 // break connection to client here. Do we also do a sock.close ???
-              //  in.close();
-             //   out.close();
+                in.close();
+                out.close();
 
                 System.out.println("sleeping for 40 seconds");
                 //sleep for 40 seconds = 40000 milliseconds (using 4000 = 4 secs for testing)
                 Thread.sleep(4000);
 
-                //call back with UDP here?
+                ConnectUDP();
+
 
                 System.out.println("we slept for 40 seconds");
 
 
-                getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
+                //getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
 
             } catch (IndexOutOfBoundsException | InterruptedException x) {                                                     // if there's an IndexOutOfBoundsException...do the following below:
                 System.out.println("Server read error");                                                // handles the IndexOutOfBoundsException's and displays the error trail to the client
@@ -98,6 +97,24 @@ class Worker extends Thread {                               // Class declaration
         } catch (IOException ioe) {                                                                     // if there's an IOException...do the following below:
             System.out.println(ioe);                                                                    // handles the IOException's and displays the error to the client
         }
+    }
+
+    private void ConnectUDP() throws IOException {
+
+        DatagramSocket newupdSocket = new DatagramSocket();
+
+        byte[] udpBuffer = new byte[256];
+        //DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length);
+        //updSocket.receive(udpPacket);
+
+        String response = "JOKEA";
+        udpBuffer = response.getBytes();
+        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49000);
+        newupdSocket.send(udpPacket);
+
+        System.out.println("sent");
+
+        newupdSocket.close();
     }
 
     static void getJokeProverb(String userName, String userId, String jokeOrderString, String proverbOrderString, Integer jokeIndex, Integer proverbIndex, PrintStream out) {          //custom method to return joke or proverb to the client
@@ -322,6 +339,7 @@ class Worker extends Thread {                               // Class declaration
     }
 }
 
+
 public class AsyncJokeServer {
 
     static boolean JokeMode = true;                                                 // sets a boolean called JokeMode to true initially.  It will be used to toggle Joke and Proverb mode
@@ -359,10 +377,26 @@ class AdminAsync implements Runnable {                                          
             System.out.println("Mode Server starting up, listening at port 45000. \n");
             while (adminSwitch) {
                 sock = servsock.accept();                                                   // continuously listening to set incoming connections to feed into our AdminWorker object
-                new AsyncJokeAdminClient.AdminWorker(sock).start();                              // while waiting for the AsyncJokeAdminClient connection, launch the AdminWorker class for processes asynch. calls
+                new AsyncJokeAdminClient.AdminWorker(sock).start();                         // while waiting for the AsyncJokeAdminClient connection, launch the AdminWorker class for processes asynch. calls
             }
         } catch (IOException ioe) {                                                        // if there's an IOException...do the following below:
             System.out.println(ioe);                                                       // handles the IOException's and displays the error to the AdminClient
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
