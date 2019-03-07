@@ -1,6 +1,6 @@
 /*
 
-1. Jeff Wiand / 1-27-19
+1. Jeff Wiand / 3-7-19
 2. Java 1.8
 3. Compilation Instructions:
     > javac AsyncJokeClient.java
@@ -17,8 +17,24 @@
     - AsyncJokeAdminClient.java
 
 5. My Notes
+    * This is the basic version of AsyncJokeClient. Compile and run the AsyncJokeClient / AsyncJokeServer / AsyncJokeAdminClient (optional) in any order
+    * Wait for the server to connect to the server ports and Enter your name
+    * Then press enter to receive a joke or proverb
+    * A prompt will come up for doing work on the client (adding 2 input numbers) while the joke or proverb is retrieved asynchronously from the server
+    * The server connects back with UDP, sending back three pieces of information:  Joke/Proverb, jokeIndex, proverbIndex
+    * Wait for the program to prompt you to "Press Enter to receive a joke or proverb", then press enter for another joke or proverb.
+    * Repeat this process for as long as you would like.
+    * To Switch modes. Hit enter to toggle modes on the AsyncJokeAdminClient window
+    *
+    *
 
-    I faked the random generation of joke order and proverb order by just shuffling two arrays containing ABCD
+    ***ONE BUG: If you wait too long after the joke is returned from the server, to enter the sum that is, then the program will handle and not prompted for the next joke
+                To reproduce this bug. Hit enter for a Joke. Look on the AsyncJokeServer window and wait for it to go through the progression:
+                "sleeping for 40 seconds"
+                "Joke or Proverb here"
+                "we slept for 40 seconds"
+
+                Then hit submit for the sum of two numbers.
  */
 
 
@@ -88,13 +104,15 @@ public class AsyncJokeClient {                                                  
             do {
                 anotherJoke = in.readLine();                                                             // if the client hits enter, it will print another joke in the server
                 indexArray.clear();                                                                      // clear out the indexArray ArrayList each loop
-                                                                                                        // instantiates a new thread that will run the logic in the AdminAsync class
+                // instantiates a new thread that will run the logic in the AdminAsync class
                 if(anotherJoke.indexOf("quit") < 0 && userName.indexOf("quit")<0) {                                                                                     // if the client doesn't initially type quit or type quit in the console in any subsequent iterations, execute the function call
 
+                    System.out.println("Getting a joke or proverb from server...");
                     indexArray = getJokeProverb(userName, userId, order.get(0), order.get(1), jokeIndex, proverbIndex, serverName, in);      // set indexArray equal to return value of getJokeProverb (jokeIndex in first indexArray, proverbIndex in second indexArray)
 
                     jokeIndex = indexArray.get(0);                                                           // set jokeIndex to the first indexArray of arrayList named indexArray
                     proverbIndex = indexArray.get(1);
+
 
                     if(jokeIndex==4){
                         jokeIndex=0;
@@ -138,13 +156,16 @@ public class AsyncJokeClient {                                                  
                     }
                 }
 
+                System.out.print("\nPress Enter to receive a joke or proverb: \n ");
+
+
             } while (anotherJoke.indexOf("quit") < 0 && userName.indexOf("quit")<0);                        // continue the loop until the user types quit on the initial prompt or in any subsequent joke/proverb iterations
             System.out.println ("Cancelled by user request.");
 
-        } catch (IOException x) {x.printStackTrace ();}                                                     // handles any IOExceptions and prints the error trail to the client
+        } catch (IOException | InterruptedException x) {x.printStackTrace ();}                                                     // handles any IOExceptions and prints the error trail to the client
     }
 
-    static ArrayList<Integer> getJokeProverb(String userName, String userId, String jokeOrderString, String proverbOrderString,Integer jokeIndex, Integer proverbIndex, String serverName, BufferedReader in){             //custom method that returns the appropriate joke or proverb from AsyncJokeServer
+    static ArrayList<Integer> getJokeProverb(String userName, String userId, String jokeOrderString, String proverbOrderString,Integer jokeIndex, Integer proverbIndex, String serverName, BufferedReader in) throws InterruptedException {             //custom method that returns the appropriate joke or proverb from AsyncJokeServer
 
         Socket sock;                                                                    // local definition of sock of type Socket
         BufferedReader fromServer;                                                      // local definition of fromServer of type BufferedReader
@@ -160,9 +181,6 @@ public class AsyncJokeClient {                                                  
             fromServer = new BufferedReader(new InputStreamReader(sock.getInputStream()));                  //Launch new BufferedReader object and set equal to locally defined fromServer
             toServer = new PrintStream(sock.getOutputStream());                                             //Launch new PrintStream object and set equal to locally defined toServer
 
-
-            // repeatedly ask for sum of 2 integers from user while (add while waiting for asynch UDP connect here !!!!)
-
             toServer.println(userId);                                                                       // sends UUID string to JokeServer
             toServer.println(userName+":"+jokeOrderString+":"+proverbOrderString);                          // sends username, jokeOrder, and proverbOrder in one string to JokeServer
             toServer.println(jokeIndex);                                                                    // sends jokeIndex integer to JokeServer
@@ -170,12 +188,12 @@ public class AsyncJokeClient {                                                  
 
             toServer.flush();                                                                               // clears out the toServer buffer
 
+            AsyncUDPWorker asyncUDP = new AsyncUDPWorker();                                                 //launch AsyncWorker thread to handle joke or proverb coming in from the AsyncJokeServer at port 49000
+            Thread thread = new Thread(asyncUDP);
+            thread.start();
 
-            AsyncUDPWorker asyncUDP = new AsyncUDPWorker();
-            asyncUDP.start();
-
-            //how to wait until this block of code is over before cutting out of loop?? (add if check/break at bottom?)
-            while(AsyncUDPWorker.receivedString == null){
+            //wait for the joke or proverb. Ask for 2 integers to sum while we wait
+            while(asyncUDP.receivedString == null){
                 System.out.println("Enter 2 numbers to sum (separated by a spaces): ");
                 String twoNumInput = in.readLine();
                 String[] twoNumSplit = twoNumInput.split(" ");
@@ -183,27 +201,52 @@ public class AsyncJokeClient {                                                  
                 System.out.println("Your sum = "+ sum);
             }
 
-            for(int i=0; i<3; i++) {                                                            // receives a 5 line response from JokeServer if no exceptions on server.
-                textFromServer = fromServer.readLine();
-                if (textFromServer !=null && i==0) System.out.println(textFromServer);
-                else if (textFromServer != null && i==1) {                                           // Receives the jokeIndex from the JokeServer, converts to an integer, and adds to index arrayList
-                    jokeIndex = Integer.parseInt(textFromServer);
-                    if(jokeIndex==4){
-                        System.out.println("Joke Cycle Complete");
-                        index.add(jokeIndex);
-                    } else{
-                        index.add(jokeIndex);
-                    }
-                } else if (textFromServer != null && i==2) {                                    // Receives the proverbIndex from the JokeServer, converts to an integer, and adds to index arrayList
-                    proverbIndex = Integer.parseInt(textFromServer);
-                    if(proverbIndex==4){
-                        System.out.println("Proverb Cycle Complete");
-                        index.add(proverbIndex);
-                    } else{
-                        index.add(proverbIndex);
-                    }
-                }
+            String jokeProverb = asyncUDP.receivedString;                                                          // define the String jokeProverb as the joke or proverb coming from AsyncJokeServer over UDP
+            System.out.println(jokeProverb);                                                                       // print the joke or proverb String to the AsyncJokeClient console
+
+
+            AsyncUDPWorker2 asyncUDPjokeIndex = new AsyncUDPWorker2();                                     //launch AsyncWorker2 thread to handle jokeIndex coming in from the AsyncJokeServer at port 49001
+            Thread thread2 = new Thread(asyncUDPjokeIndex);
+            thread2.start();
+
+            while(asyncUDPjokeIndex.receivedString == null){                                                // wait for the UDP response for jokeIndex from AsyncJokeServer
+                Thread.sleep(100);
             }
+
+            String jokeIndexStringNew = asyncUDPjokeIndex.receivedString;                                   // define the String jokeIndexStringNew as the jokeIndex coming from AsyncJokeServer over UDP
+            int jokeIndexNew = Integer.parseInt(jokeIndexStringNew);                                        // parse its integer value
+
+            AsyncUDPWorker3 asyncUDPproverbIndex = new AsyncUDPWorker3();                                   //launch AsyncWorker3 thread to handle jokeIndex coming in from the AsyncJokeServer at port 49002
+            Thread thread3 = new Thread(asyncUDPproverbIndex);
+            thread3.start();
+
+            while(asyncUDPproverbIndex.receivedString == null){                                         // wait for the UDP response for proverbIndex from AsyncJokeServer
+                Thread.sleep(100);
+            }
+
+            String proverbIndexStringNew = asyncUDPproverbIndex.receivedString;                         // define the String proverbIndexStringNew as the proverbIndex coming from AsyncJokeServer over UDP
+            int proverbIndexNew = Integer.parseInt(proverbIndexStringNew);                              // parse its integer value
+
+
+            //conditional block to handle when the joke or proverb cycle completes. Adds the joke or proverb index to the arraylist of indices for processing where we are in the randomized order
+            if(jokeIndexNew==4){
+                System.out.println("Joke Cycle Complete");
+                index.add(jokeIndexNew);
+            } else{
+                index.add(jokeIndexNew);
+            }
+
+            if(proverbIndexNew==4){
+                System.out.println("Proverb Cycle Complete");
+                index.add(proverbIndexNew);
+            } else{
+                index.add(proverbIndexNew);
+            }
+
+            // RESET ALL RECEIVED STRINGS TO NULL HERE.  This allows the next loop through this method to work correctly
+            asyncUDP.receivedString = null;
+            asyncUDPjokeIndex.receivedString = null;
+            asyncUDPproverbIndex.receivedString = null;
 
             sock.close();                                                                       // closes only the current connection
         }
@@ -217,22 +260,73 @@ public class AsyncJokeClient {                                                  
 }
 
 
-class AsyncUDPWorker extends Thread {
-    byte[] udpBufferReceived = new byte[256];
+class AsyncUDPWorker extends Thread {                                                           // class definition of AsyncUDPWorker to handle UDP communication over port 49000
+    byte[] udpBufferReceived = new byte[256];                                                   // definition of variables udpBufferReceived, receivedString, udpSocket, udpPacket
     public static String receivedString = null;
+    public static DatagramSocket udpSocket;
+    public static DatagramPacket udpPacket;
 
-    public void run() {
+    public void run() {                                                                         // run() method that executes on a thread.start() call
         try {
-            DatagramSocket udpSocket = new DatagramSocket(49000);
-            DatagramPacket udpPacket = new DatagramPacket(udpBufferReceived, udpBufferReceived.length);
-            udpSocket.receive(udpPacket);
+            udpSocket = new DatagramSocket(49000);                                        // connect to port 49000
+            udpPacket = new DatagramPacket(udpBufferReceived, udpBufferReceived.length);        // create packet that is filled with the joke or proverb from AsyncJokeServer
+            udpSocket.receive(udpPacket);                                                       // receive the packet
 
-            receivedString = new String(udpPacket.getData(), 0, udpPacket.getLength());
-            System.out.println("Received String = " + receivedString);
+            receivedString = new String(udpPacket.getData(), 0, udpPacket.getLength());     // redefine receivedString as the joke or proverb from AsyncJokeServer
 
-            udpSocket.close();
+            udpSocket.close();                                                                  //close the connection
 
-        } catch (SocketException e) {
+        } catch (SocketException e) {                                                       //handles errors here
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+
+class AsyncUDPWorker2 extends Thread {                                                      // class definition of AsyncUDPWorker2 to handle UDP communication over port 49001
+    byte[] udpBufferReceived = new byte[256];                                               // definition of variables udpBufferReceived, receivedString, udpSocket, udpPacket
+    public static String receivedString = null;
+    public static DatagramSocket udpSocket;
+    public static DatagramPacket udpPacket;
+
+    public void run() {                                                             // run() method that executes on a thread.start() call
+        try {
+            udpSocket = new DatagramSocket(49001);                                      //connect to port 49001
+            udpPacket = new DatagramPacket(udpBufferReceived, udpBufferReceived.length);      // create the packet that is filled with the jokeIndex from the AsyncJokeServer
+            udpSocket.receive(udpPacket);                                                     // receive the packet
+
+            receivedString = new String(udpPacket.getData(), 0, udpPacket.getLength());   // redefine receivedString as the jokeIndex from AsyncJokeServer
+
+            udpSocket.close();                                                                   // close the connection
+
+        } catch (SocketException e) {                                                   //handles errors here
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+
+class AsyncUDPWorker3 extends Thread {                                                      // class definition of AsyncUDPWorker to handle UDP communication over port 49002
+    byte[] udpBufferReceived = new byte[256];                                               // definition of variables udpBufferReceived, receivedString, udpSocket, udpPacket
+    public static String receivedString = null;
+    public static DatagramSocket udpSocket;
+    public static DatagramPacket udpPacket;
+
+    public void run() {                                                                             // run() method that executes on a thread.start() call
+        try {
+            udpSocket = new DatagramSocket(49002);                                              //connect to port 49002
+            udpPacket = new DatagramPacket(udpBufferReceived, udpBufferReceived.length);             // create the packet that is filled with the proverbIndex from the AsyncJokeServer
+            udpSocket.receive(udpPacket);                                                           // receive the packet
+
+            receivedString = new String(udpPacket.getData(), 0, udpPacket.getLength());         // redefine receivedString as the proverbIndex from AsyncJokeServer
+
+            udpSocket.close();                      // close the connection
+
+        } catch (SocketException e) {               //handles errors here
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();

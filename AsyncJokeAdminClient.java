@@ -1,6 +1,6 @@
 /*
 
-1. Jeff Wiand / 1-27-19
+1. Jeff Wiand / 3-7-19
 2. Java 1.8
 3. Compilation Instructions:
     > javac AsyncJokeAdminClient.java
@@ -17,7 +17,7 @@
     - AsyncJokeAdminClient.java
 
 5. My Notes
-
+    * This is the exact same AdminClient from my JokeServer submission. Works the exactly the same with the Asynchronous additions
  */
 
 import java.io.*;       //Pull in the Java Input - Output libraries for AsyncJokeAdminClient.java use

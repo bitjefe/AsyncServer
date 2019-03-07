@@ -1,6 +1,6 @@
 /*
 
-1. Jeff Wiand / 1-27-19
+1. Jeff Wiand / 3-7-19
 2. Java 1.8
 3. Compilation Instructions:
     > javac AsyncJokeServer.java
@@ -19,10 +19,10 @@
 
     *Jokes taken from http://pun.me/pages/dad-jokes.php
     *Proverbs taken from https://web.sonoma.edu/users/d/daniels/chinaproverbs.html
-    *
-    * Slight bug, inefficiency in re=randomization of the joke/proverb order occurs when the "complete message" is sent
-    * the arrayList re-randomizes twice in this instance. This is an unnecessary server calculation but it still functions correctly.
-    * This would be low-hanging fruit to optimize the code in a refactor
+
+    *This refactor to Asynchronous calls and UDP contains 3 "sendUDPJokeProverb" helper functions to connect to UDP port 49000, 49001, 49002
+    *This server receives the request from the AsyncJokeClient. Breaks the TCP connection, retrieves the Joke or Proverb, and sends back 3 pieces of info with UDP (joke/proverb, jokeIndex, proverbIndex)
+
  */
 
 import java.io.*;       //Pull in the Java Input - Output libraries for AsyncJokeServer.java use
@@ -77,59 +77,79 @@ class Worker extends Thread {                               // Class declaration
                 out.close();
 
                 System.out.println("sleeping for 40 seconds");
-                //sleep for 40 seconds = 40000 milliseconds (using 4000 = 4 secs for testing)
+                //sleep for 40 seconds = 40000 milliseconds (can using 4000 = 4 secs for testing & grading)
                 Thread.sleep(4000);
 
-                getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
+                DatagramSocket socket = ConnectUDP();                   //create a DatagramSocket object socket and pass it to getJokeProverb method
+
+                getJokeProverb(userName, userId, jokeOrderString, proverbOrderString, jokeIndex, proverbIndex, out, socket);         // call getJokeProverb custom method to return the correct joke or proverb and state back to the AsyncJokeClient
 
                 System.out.println("we slept for 40 seconds");
 
+                Thread.sleep(3000);                                 // i put this sleep of 3 seconds in to help smooth the program hang when you wait too long to enter the numbers to sum on AsyncJokeClient
+                sock.close(); // closes only the current connection
 
             } catch (IndexOutOfBoundsException | InterruptedException x) {                                                     // if there's an IndexOutOfBoundsException...do the following below:
                 System.out.println("Server read error");                                                // handles the IndexOutOfBoundsException's and displays the error trail to the client
                 x.printStackTrace();
             }
-            sock.close();                                                                               // closes only the current connection
+
         } catch (IOException ioe) {                                                                     // if there's an IOException...do the following below:
             System.out.println(ioe);                                                                    // handles the IOException's and displays the error to the client
         }
     }
-/*
-    private void ConnectUDP() throws IOException {
+
+    private static DatagramSocket ConnectUDP() throws IOException {         //Create a new UDP socket and return it to the main function
 
         DatagramSocket newupdSocket = new DatagramSocket();
 
         byte[] udpBuffer = new byte[256];
-        //DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length);
-        //updSocket.receive(udpPacket);
 
-        String response = "JOKEA";
-        udpBuffer = response.getBytes();
-        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49000);
-        newupdSocket.send(udpPacket);
-
-        System.out.println("sent");
-
-        newupdSocket.close();
-    }
-*/
-    private static void sendUDPJokeProverb(String jokeProverbToSend) throws IOException {
-
-        DatagramSocket newupdSocket = new DatagramSocket();
-
-        byte[] udpBuffer = new byte[256];
-        //DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length);
-        //updSocket.receive(udpPacket);
-
-        String response = jokeProverbToSend;
-        udpBuffer = response.getBytes();
-        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49000);
-        newupdSocket.send(udpPacket);
-
-        newupdSocket.close();
+        return newupdSocket;
     }
 
-    static void getJokeProverb(String userName, String userId, String jokeOrderString, String proverbOrderString, Integer jokeIndex, Integer proverbIndex, PrintStream out) {          //custom method to return joke or proverb to the client
+    private static void sendUDPJokeProverb(DatagramSocket socket,  String jokeProverbToSend) throws IOException {                       //helper method to send Joke or Proverb with UDP
+
+        byte[] udpBuffer = new byte[256];                   //declare buffer to read in data
+
+        String response = jokeProverbToSend;                                                                                            // store jokeProverb parameter into String response
+        udpBuffer = response.getBytes();                                                                                                //get the bytes of response and put in udpBuffer
+        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49000);     // create a DatagramPacket object and feed in udpBuffer, InetAddress of localhost, and port to connect
+        socket.send(udpPacket);                                                                                                         // send the packet to AsyncJokeClient
+
+        socket.close();                         //close the connection
+    }
+
+    private static void sendJokeIndex(DatagramSocket socket, String jokeIndexString) throws IOException {                         //helper method to send joke index with UDP
+
+        byte[] udpBuffer = new byte[256];                       //declare buffer to read in data
+
+        String response = jokeIndexString;                                                                                            // store jokeIndexString parameter into String response
+        udpBuffer = response.getBytes();                                                                                              //get the bytes of response and put in udpBuffer
+        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49001);  // create a DatagramPacket object and feed in udpBuffer, InetAddress of localhost, and port to connect
+        socket.send(udpPacket);                                                                                                       // send the packet to AsyncJokeClient
+
+        socket.close();                         //close the connection
+    }
+
+    private static void sendProverbIndex(DatagramSocket socket, String proverbIndexString) throws IOException {                     //helper method to send proverb index with UDP
+
+        byte[] udpBuffer = new byte[256];       //declare teh buffer to read in data
+
+        String response = proverbIndexString;                                                                                       // store proverbIndexString parameter into String response
+        udpBuffer = response.getBytes();                                                                                            //get the bytes of response and put in udpBuffer
+        DatagramPacket udpPacket = new DatagramPacket(udpBuffer, udpBuffer.length, InetAddress.getByName("localhost"), 49002);  // create a DatagramPacket object and feed in udpBuffer, InetAddress of localhost, and port to connect
+        socket.send(udpPacket);                                                                                                       // send the packet to AsyncJokeClient
+
+        socket.close();                         //close the connection
+    }
+
+
+
+
+    static void getJokeProverb(String userName, String userId, String jokeOrderString, String proverbOrderString,
+                               Integer jokeIndex, Integer proverbIndex, PrintStream out, DatagramSocket socket) throws IOException{          //custom method to return joke or proverb to the client
+
 
         // initializes all the ArrayLists needed to process the incoming joke/proverb order and states
         List<String> userIdArray = new ArrayList<>();
@@ -193,64 +213,63 @@ class Worker extends Thread {                               // Class declaration
                 } else {                                                            // if the jokeIndex is between 0-3, do the following:
                     if(jokeIndex ==0) {                                             // if the jokeIndex equals 0:
                         if(jokeOrderList.get(0).equals("A")){                       // This set of if-else statements looks to match the the first random joke in jokeOrderList to "A","B","C", or "D" and send the corresponding joke back to the AsyncJokeClient
-                          //  out.println(jokesArr[0][1]);
-                            sendUDPJokeProverb(jokesArr[0][1]);     //RETURNS FIRST JOKE!!, REPEAT FOR ALL INSTANCES BELOW AND JOKE+PROVERBiNDEX
+                            sendUDPJokeProverb(socket,jokesArr[0][1]);              //RETURNS FIRST JOKE!!, REPEATED FOR ALL INSTANCES BELOW AND JOKE+PROVERBINDEX
                             System.out.println((jokesArr[0][1]));
                         } else if(jokeOrderList.get(0).equals("B")){
-                            out.println(jokesArr[1][1]);
+                            sendUDPJokeProverb(socket,jokesArr[1][1]);
                             System.out.println((jokesArr[1][1]));
                         } else if(jokeOrderList.get(0).equals("C")) {
-                            out.println(jokesArr[2][1]);
+                            sendUDPJokeProverb(socket,jokesArr[2][1]);
                             System.out.println((jokesArr[2][1]));
                         } else if(jokeOrderList.get(0).equals("D")) {
-                            out.println(jokesArr[3][1]);
+                            sendUDPJokeProverb(socket,jokesArr[3][1]);
                             System.out.println((jokesArr[3][1]));
                         }
                     }
 
                     else if(jokeIndex ==1) {                                        // if the jokeIndex equals 1:
                         if(jokeOrderList.get(1).equals("A")){                       // This set of if-else statements looks to match the the second random joke in jokeOrderList to "A","B","C", or "D" and send the corresponding joke back to the AsyncJokeClient
-                            out.println(jokesArr[0][1]);
+                            sendUDPJokeProverb(socket,jokesArr[0][1]);
                             System.out.println((jokesArr[0][1]));
                         } else if(jokeOrderList.get(1).equals("B")){
-                            out.println(jokesArr[1][1]);
+                            sendUDPJokeProverb(socket,jokesArr[1][1]);
                             System.out.println((jokesArr[1][1]));
                         } else if(jokeOrderList.get(1).equals("C")) {
-                            out.println(jokesArr[2][1]);
+                            sendUDPJokeProverb(socket,jokesArr[2][1]);
                             System.out.println((jokesArr[2][1]));
                         } else if(jokeOrderList.get(1).equals("D")) {
-                            out.println(jokesArr[3][1]);
+                            sendUDPJokeProverb(socket,jokesArr[3][1]);
                             System.out.println((jokesArr[3][1]));
                         }
                     }
 
                     else if(jokeIndex ==2) {                                        // if the jokeIndex equals 2
                         if(jokeOrderList.get(2).equals("A")){                       // This set of if-else statements looks to match the the third random joke in jokeOrderList to "A","B","C", or "D" and send the corresponding joke back to the AsyncJokeClient
-                            out.println(jokesArr[0][1]);
+                            sendUDPJokeProverb(socket,jokesArr[0][1]);
                             System.out.println((jokesArr[0][1]));
                         } else if(jokeOrderList.get(2).equals("B")){
-                            out.println(jokesArr[1][1]);
+                            sendUDPJokeProverb(socket,jokesArr[1][1]);
                             System.out.println((jokesArr[1][1]));
                         } else if(jokeOrderList.get(2).equals("C")) {
-                            out.println(jokesArr[2][1]);
+                            sendUDPJokeProverb(socket,jokesArr[2][1]);
                             System.out.println((jokesArr[2][1]));
                         } else if(jokeOrderList.get(2).equals("D")) {
-                            out.println(jokesArr[3][1]);
+                            sendUDPJokeProverb(socket,jokesArr[3][1]);
                             System.out.println((jokesArr[3][1]));
                         }
                     }
                     else if(jokeIndex ==3) {                                        // if the jokeIndex equals 3
                         if(jokeOrderList.get(3).equals("A")){                       // This set of if-else statements looks to match the the fourth random joke in jokeOrderList to "A","B","C", or "D" and send the corresponding joke back to the AsyncJokeClient
-                            out.println(jokesArr[0][1]);
+                            sendUDPJokeProverb(socket,jokesArr[0][1]);
                             System.out.println((jokesArr[0][1]));
                         } else if(jokeOrderList.get(3).equals("B")){
-                            out.println(jokesArr[1][1]);
+                            sendUDPJokeProverb(socket,jokesArr[1][1]);
                             System.out.println((jokesArr[1][1]));
                         } else if(jokeOrderList.get(3).equals("C")) {
-                            out.println(jokesArr[2][1]);
+                            sendUDPJokeProverb(socket,jokesArr[2][1]);
                             System.out.println((jokesArr[2][1]));
                         } else if(jokeOrderList.get(3).equals("D")) {
-                            out.println(jokesArr[3][1]);
+                            sendUDPJokeProverb(socket,jokesArr[3][1]);
                             System.out.println((jokesArr[3][1]));
                         }
                     }
@@ -278,63 +297,63 @@ class Worker extends Thread {                               // Class declaration
                 } else {                                                            // if the proverbIndex is between 0-3, do the following:
                     if(proverbIndex ==0) {                                          // if the proverbIndex equals 0:
                         if(proverbOrderList.get(0).equals("A")){                    // This set of if-else statements looks to match the the first random proverb in proverbOrderList to "A","B","C", or "D" and send the corresponding proverb back to the AsyncJokeClient
-                            out.println(proverbsArr[0][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[0][1]);
                             System.out.println((proverbsArr[0][1]));
                         } else if(proverbOrderList.get(0).equals("B")){
-                            out.println(proverbsArr[1][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[1][1]);
                             System.out.println((proverbsArr[1][1]));
                         } else if(proverbOrderList.get(0).equals("C")) {
-                            out.println(proverbsArr[2][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[2][1]);
                             System.out.println((proverbsArr[2][1]));
                         } else if(proverbOrderList.get(0).equals("D")) {
-                            out.println(proverbsArr[3][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[3][1]);
                             System.out.println((proverbsArr[3][1]));
                         }
                     }
 
                     else if(proverbIndex ==1) {                                     // if the proverbIndex equals 1:
                         if(proverbOrderList.get(1).equals("A")){                    // This set of if-else statements looks to match the the second random proverb in proverbOrderList to "A","B","C", or "D" and send the corresponding proverb back to the AsyncJokeClient
-                            out.println(proverbsArr[0][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[0][1]);
                             System.out.println((proverbsArr[0][1]));
                         } else if(proverbOrderList.get(1).equals("B")){
-                            out.println(proverbsArr[1][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[1][1]);
                             System.out.println((proverbsArr[1][1]));
                         } else if(proverbOrderList.get(1).equals("C")) {
-                            out.println(proverbsArr[2][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[2][1]);
                             System.out.println((proverbsArr[2][1]));
                         } else if(proverbOrderList.get(1).equals("D")) {
-                            out.println(proverbsArr[3][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[3][1]);
                             System.out.println((proverbsArr[3][1]));
                         }
                     }
 
                     else if(proverbIndex ==2) {                                     // if the proverbIndex equals 2:
                         if(proverbOrderList.get(2).equals("A")){                    // This set of if-else statements looks to match the the third random proverb in proverbOrderList to "A","B","C", or "D" and send the corresponding proverb back to the AsyncJokeClient
-                            out.println(proverbsArr[0][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[0][1]);
                             System.out.println((proverbsArr[0][1]));
                         } else if(proverbOrderList.get(2).equals("B")){
-                            out.println(proverbsArr[1][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[1][1]);
                             System.out.println((proverbsArr[1][1]));
                         } else if(proverbOrderList.get(2).equals("C")) {
-                            out.println(proverbsArr[2][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[2][1]);
                             System.out.println((proverbsArr[2][1]));
                         } else if(proverbOrderList.get(2).equals("D")) {
-                            out.println(proverbsArr[3][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[3][1]);
                             System.out.println((proverbsArr[3][1]));
                         }
                     }
                     else if(proverbIndex ==3) {                                     // if the proverbIndex equals 3:
                         if(proverbOrderList.get(3).equals("A")){                    // This set of if-else statements looks to match the the fourth random proverb in proverbOrderList to "A","B","C", or "D" and send the corresponding proverb back to the AsyncJokeClient
-                            out.println(proverbsArr[0][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[0][1]);
                             System.out.println((proverbsArr[0][1]));
                         } else if(proverbOrderList.get(3).equals("B")){
-                            out.println(proverbsArr[1][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[1][1]);
                             System.out.println((proverbsArr[1][1]));
                         } else if(proverbOrderList.get(3).equals("C")) {
-                            out.println(proverbsArr[2][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[2][1]);
                             System.out.println((proverbsArr[2][1]));
                         } else if(proverbOrderList.get(3).equals("D")) {
-                            out.println(proverbsArr[3][1]);
+                            sendUDPJokeProverb(socket,proverbsArr[3][1]);
                             System.out.println((proverbsArr[3][1]));
                         }
                     }
@@ -346,9 +365,25 @@ class Worker extends Thread {                               // Class declaration
             }
         }
 
-        out.println(jokeIndex);                                                     // send the jokeIndex integer back to the AsyncJokeClient to record it's current joke state.
-        out.println(proverbIndex);                                                  // send the proverbIndex integer back to the AsyncJokeClient to record it's current proverb state
-                                                                                    // Neither of these indexes (state of the client) are stored on the server. Simply received, processed, and sent back to the AsyncJokeClient
+        try{
+            Thread.sleep(2000);                                                                // sleep 2 seconds to let communication settle. Not sure if this is needed but seemed to help in development
+        } catch (IndexOutOfBoundsException | InterruptedException x) {                               // if there's an IndexOutOfBoundsException...do the following below:
+            System.out.println("Server read error");                                                // handles the IndexOutOfBoundsException's and displays the error trail to the client
+            x.printStackTrace();
+        }
+        DatagramSocket jSocket = ConnectUDP();                                                      //create a DatagramSocket object jSocket
+        sendJokeIndex(jSocket,String.valueOf(jokeIndex));                                           //send the jokeIndex to the AsyncJokeClient
+
+        try{
+            Thread.sleep(2000);                                                                // sleep 2 seconds to let communication settle. Not sure if this is needed but seemed to help in development
+        } catch (IndexOutOfBoundsException | InterruptedException x) {                              // if there's an IndexOutOfBoundsException...do the following below:
+            System.out.println("Server read error");                                                // handles the IndexOutOfBoundsException's and displays the error trail to the client
+            x.printStackTrace();
+        }
+
+        DatagramSocket pSocket = ConnectUDP();                                              //create a DatagramSocket object pSocket
+        sendProverbIndex(pSocket,String.valueOf(proverbIndex));                             //send the proverbIndex to the AsyncJokeClient
+
     }
 }
 
